@@ -4,34 +4,8 @@
 #include <memory.h>
 #include <sys/mman.h>
 #include <unistd.h>
-
-#define PAGE_NUM 100
-#define PAGE_SIZE 4096
-#define BLK_MAX_POW2 11
-
-struct free_block_header {
-    struct free_block_header* next_bh;
-};
-typedef struct free_block_header FreeBH;
-
-struct free_page {
-    struct free_page* next_ph;
-    char page_area[PAGE_SIZE - sizeof(struct free_page*)];
-};
-typedef struct free_page FreePage;
-
-struct used_page_header {
-    struct used_page_header* next_ph;
-    short blocks_free;
-    void* first_block;
-    char usage_mask[];
-};
-typedef struct used_page_header UsedPH;
-
-union header_ptr {
-    FreePage* free_page;
-    UsedPH* used_ph;
-};
+#include "mem_types.h"
+#include <stdint.h>
 
 //static void* page_pointers[PAGE_NUM];
 static void* mem_start = NULL;
@@ -113,14 +87,14 @@ void* mem_init(void)
     for (int i = 0; i < PAGE_NUM; ++i) {
         header_ptrs[i].free_page = &free_phs[i];
     }
-    header_ptrs[PAGE_NUM-1].free_page |= 1;
+    header_ptrs[PAGE_NUM-1].free_page = (uintptr_t) header_ptrs[PAGE_NUM-1].free_page | 1; // TODO check this
     return mapping_area;
 }
 
-size_t search_free_page(size_t size) {
-    int pages_num = size / PAGE_SIZE;
-    bool b = header_ptrs
-}
+//size_t search_free_page(size_t size) {
+//    int pages_num = size / PAGE_SIZE;
+//    bool b = header_ptrs
+//}
 
 void* mem_alloc(size_t size)
 {
@@ -142,14 +116,16 @@ void* mem_alloc(size_t size)
                 formated_page_lists[pow2] = ph->next_ph;
             }
             size_t block_idx = setBit(ph->usage_mask, mask_len);
-            block_len /= 8; // in bytes
+            //block_len /= 8; // in bytes
             char* first_block = ph->first_block;
             return first_block + block_len * block_idx;
         }
         if (first_free_page == NULL) {
             return NULL; // no memory left
         }
-        block_len /= 8; // in bytes
+        
+        /* Format new page */
+       // block_len /= 8; // in bytes
         FreePage* fp = first_free_page;
         first_free_page = fp->next_ph;
         UsedPH* new_ph;
@@ -165,11 +141,15 @@ void* mem_alloc(size_t size)
         new_ph->next_ph = NULL;
         memset(new_ph->usage_mask, 0, mask_len);
         new_ph->usage_mask[0] = 1;
+        formated_page_lists[pow2] = new_ph;
         return new_ph->first_block;
     }
     
+    /* if big block */
+    
     return NULL;
 }
+//TODO add the checks
 
 void* mem_realloc(void *addr, size_t size)
 {
