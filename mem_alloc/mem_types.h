@@ -28,16 +28,16 @@ struct free_big_bh {
 };
 typedef struct free_big_bh FreeBigBH;
 
-struct free_block_header {
-    struct free_block_header* next_bh;
-};
-typedef struct free_block_header FreeBH;
+//struct free_block_header {
+//    struct free_block_header* next_bh;
+//};
+//typedef struct free_block_header FreeBH;
 
-struct free_page {
-    struct free_page* next_ph;
-    char page_area[PAGE_SIZE - sizeof(struct free_page*)];
-};
-typedef struct free_page FreePage;
+//struct free_page {
+//    struct free_page* next_ph;
+//    char page_area[PAGE_SIZE - sizeof(struct free_page*)];
+//};
+//typedef struct free_page FreePage;
 
 struct used_page_header {
     struct used_page_header* next_ph;
@@ -47,8 +47,22 @@ struct used_page_header {
 };
 typedef struct used_page_header UsedPH;
 
+enum header_type {
+    USED_PH,
+    USED_PH32,
+    USED_BIG_BH
+};
+typedef enum header_type HeaderType;
+
+struct header_location {
+    void* addr;
+    enum header_type h_type;
+};
+typedef struct header_location HeaderLocation;
+
 union header_ptr {
-    FreePage* free_page;
+    FreeBigBH* free_page;
+    UsedBigBH* used_big_bh;
     UsedPH* used_ph;
 };
 

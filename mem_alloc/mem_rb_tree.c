@@ -11,7 +11,7 @@ void set_rb_root_var(FreeBigBH** root_pp)
     rb_root_pp = root_pp;
 }
 
-int node_cmp(Node n1, Node n2)
+static int node_cmp(Node n1, Node n2)
 {
     if (n1 == n2) {
         return 0;
@@ -22,14 +22,14 @@ int node_cmp(Node n1, Node n2)
     return n1->info.size > n2->info.size? 1: -1;
 }
 
-Node grandparent(Node n) {
+static Node grandparent(Node n) {
     assert (n != NULL);
     assert (n->rb_parent != NULL); /* Not the root node */
     assert (n->rb_parent->rb_parent != NULL); /* Not child of root */
     return n->rb_parent->rb_parent;
 }
 
-Node sibling(Node n) {
+static Node sibling(Node n) {
     assert (n != NULL);
     assert (n->rb_parent != NULL); /* Root node has no sibling */
     if (n == n->rb_parent->rb_left)
@@ -38,14 +38,14 @@ Node sibling(Node n) {
         return n->rb_parent->rb_left;
 }
 
-Node uncle(Node n) {
+static Node uncle(Node n) {
     assert (n != NULL);
     assert (n->rb_parent != NULL); /* Root node has no uncle */
     assert (n->rb_parent->rb_parent != NULL); /* Children of root have no uncle */
     return sibling(n->rb_parent);
 }
 
-Node lookup_node(Node key_node) {
+static Node lookup_node(Node key_node) {
     Node n = *rb_root_pp;
     while (n != NULL) {
         int comp_result = node_cmp(key_node, n);
@@ -61,12 +61,20 @@ Node lookup_node(Node key_node) {
     return n;
 }
 
-//void* rbtree_lookup(rbtree t, size_t key, compare_func compare) {
-//    node n = lookup_node(t, key, compare);
-//    return n == NULL ? NULL : n->value;
-//}
+FreeBigBH *rbtree_lookup(size_t size) 
+{
+    Node n = *rb_root_pp;
+    while (n != NULL) {
+        if (size <= n->info.size) {
+            return n;
+        } else {
+            n = n->rb_right;
+        }
+    }
+    return n;
+}
 
-void replace_node(Node oldn, Node newn) {
+static void replace_node(Node oldn, Node newn) {
     if (oldn->rb_parent == NULL) {
         *rb_root_pp = newn;
     } else {
@@ -80,7 +88,7 @@ void replace_node(Node oldn, Node newn) {
     }
 }
 
-void rotate_left(Node n) {
+static void rotate_left(Node n) {
     Node r = n->rb_right;
     replace_node(n, r);
     n->rb_right = r->rb_left;
@@ -91,7 +99,7 @@ void rotate_left(Node n) {
     n->rb_parent = r;
 }
 
-void rotate_right(Node n) {
+static void rotate_right(Node n) {
     Node L = n->rb_left;
     replace_node(n, L);
     n->rb_left = L->rb_right;
@@ -102,13 +110,14 @@ void rotate_right(Node n) {
     n->rb_parent = L;
 }
 
-void insert_case1(Node n);
-void insert_case2(Node n);
-void insert_case3(Node n);
-void insert_case4(Node n);
-void insert_case5(Node n);
+static void insert_case1(Node n);
+static void insert_case2(Node n);
+static void insert_case3(Node n);
+static void insert_case4(Node n);
+static void insert_case5(Node n);
 
-void rbtree_insert(FreeBigBH* ins_node) {
+void rbtree_insert(FreeBigBH* ins_node) 
+{
    // node inserted_node = new_node(key, value, RED, NULL, NULL);
     ins_node->rb_color = RED;
     ins_node->rb_left = ins_node->rb_right = NULL;
@@ -144,26 +153,26 @@ void rbtree_insert(FreeBigBH* ins_node) {
     insert_case1(ins_node);
 }
 
-void insert_case1(Node n) {
+static void insert_case1(Node n) {
     if (n->rb_parent == NULL)
         n->rb_color = BLACK;
     else
         insert_case2(n);
 }
 
-RBColor node_color(Node n)
+static RBColor node_color(Node n)
 {
     return n == NULL? BLACK: n->rb_color;
 }
 
-void insert_case2(Node n) {
+static void insert_case2(Node n) {
     if (node_color(n->rb_parent) == BLACK)
         return; /* Tree is still valid */
     else
         insert_case3(n);
 }
 
-void insert_case3(Node n) {
+static void insert_case3(Node n) {
     if (node_color(uncle(n)) == RED) {
         n->rb_parent->rb_color = BLACK;
         uncle(n)->rb_color = BLACK;
@@ -174,7 +183,7 @@ void insert_case3(Node n) {
     }
 }
 
-void insert_case4(Node n) {
+static void insert_case4(Node n) {
     if (n == n->rb_parent->rb_right && n->rb_parent == grandparent(n)->rb_left) {
         rotate_left(n->rb_parent);
         n = n->rb_left;
@@ -185,7 +194,7 @@ void insert_case4(Node n) {
     insert_case5(n);
 }
 
-void insert_case5(Node n) {
+static void insert_case5(Node n) {
     n->rb_parent->rb_color = BLACK;
     grandparent(n)->rb_color = RED;
     if (n == n->rb_parent->rb_left && n->rb_parent == grandparent(n)->rb_left) {
@@ -204,15 +213,16 @@ static Node maximum_node(Node n) {
     return n;
 }
 
-void delete_case1(Node n);
-void delete_case2(Node n);
-void delete_case3(Node n);
-void delete_case4(Node n);
-void delete_case5(Node n);
-void delete_case6(Node n);
+static void delete_case1(Node n);
+static void delete_case2(Node n);
+static void delete_case3(Node n);
+static void delete_case4(Node n);
+static void delete_case5(Node n);
+static void delete_case6(Node n);
 
 // TODO fix dublicated values case.
-void rbtree_delete(Node del_node) {
+void rbtree_delete(FreeBigBH *del_node) 
+{
     Node child;
     Node n = lookup_node(del_node);
     if (n == NULL) return;  /* Key not found, do nothing */
@@ -237,14 +247,14 @@ void rbtree_delete(Node del_node) {
     //free(n);
 }
 
-void delete_case1(Node n) {
+static void delete_case1(Node n) {
     if (n->rb_parent == NULL)
         return;
     else
         delete_case2(n);
 }
 
-void delete_case2(Node n) {
+static void delete_case2(Node n) {
     if (node_color(sibling(n)) == RED) {
         n->rb_parent->rb_color = RED;
         sibling(n)->rb_color = BLACK;
@@ -256,7 +266,7 @@ void delete_case2(Node n) {
     delete_case3(n);
 }
 
-void delete_case3(Node n) {
+static void delete_case3(Node n) {
     if (node_color(n->rb_parent) == BLACK &&
         node_color(sibling(n)) == BLACK &&
         node_color(sibling(n)->rb_left) == BLACK &&
@@ -269,7 +279,7 @@ void delete_case3(Node n) {
         delete_case4(n);
 }
 
-void delete_case4(Node n) {
+static void delete_case4(Node n) {
     if (node_color(n->rb_parent) == RED &&
         node_color(sibling(n)) == BLACK &&
         node_color(sibling(n)->rb_left) == BLACK &&
@@ -282,7 +292,7 @@ void delete_case4(Node n) {
         delete_case5(n);
 }
 
-void delete_case5(Node n) {
+static void delete_case5(Node n) {
     if (n == n->rb_parent->rb_left &&
         node_color(sibling(n)) == BLACK &&
         node_color(sibling(n)->rb_left) == RED &&
@@ -304,7 +314,7 @@ void delete_case5(Node n) {
     delete_case6(n);
 }
 
-void delete_case6(Node n) {
+static void delete_case6(Node n) {
     sibling(n)->rb_color = node_color(n->rb_parent);
     n->rb_parent->rb_color = BLACK;
     if (n == n->rb_parent->rb_left) {
