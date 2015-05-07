@@ -40,16 +40,17 @@ typedef struct free_big_bh FreeBigBH;
 
 struct used_page_header {
     size_t prev_size; // TODO mb make isUsed here - no
-    struct used_page_header* next_ph;
+    size_t next_ph_idx;
+    unsigned char blk_size_pow2;
     //short blocks_free;
-    void* first_block;
+    //void* first_block;
     char usage_mask[];
 };
 typedef struct used_page_header UsedPH;
 
 enum header_type {
     USED_PH,
-    USED_PH32,
+    // USED_PH32,
     USED_BIG_BH,
     FREE_BIG_BH
 };

@@ -21,7 +21,7 @@ static int node_cmp(Node n1, Node n2)
     }
     return n1->info.size > n2->info.size? 1: -1;
 }
-
+mem_free(addr);
 static Node grandparent(Node n) {
     assert (n != NULL);
     assert (n->rb_parent != NULL); /* Not the root node */
@@ -129,6 +129,7 @@ void rbtree_insert(FreeBigBH* ins_node)
             int comp_result = node_cmp(ins_node, n);
             if (comp_result == 0) {
                 n->info = ins_node->info;
+                printf("ERROR: RB\n");
                 //n->value = value;
                 return;
             } else if (comp_result < 0) {
@@ -224,14 +225,16 @@ static void delete_case6(Node n);
 void rbtree_delete(FreeBigBH *del_node) 
 {
     Node child;
-    Node n = lookup_node(del_node);
+    Node n = del_node; //was Node n = lookup_node(del_node);
+    Node pred = NULL;
     if (n == NULL) return;  /* Key not found, do nothing */
     if (n->rb_left != NULL && n->rb_right != NULL) {
         /* Copy key/value from predecessor and then delete it instead */
-        Node pred = maximum_node(n->rb_left);
+        pred = maximum_node(n->rb_left);
 //        n->key   = pred->key;
 //        n->value = pred->value;
-        n->info = pred->info; // TODO fix it!
+        
+        //was: n->info = pred->info; // TODO fix it!
         n = pred;
     }
 
@@ -244,6 +247,11 @@ void rbtree_delete(FreeBigBH *del_node)
     replace_node(n, child);
     if (n->rb_parent == NULL && child != NULL) // root should be black
         child->rb_color = BLACK;
+    
+    //TODO check this:
+    if (pred != NULL) {
+        replace_node(del_node, pred);
+    }
     //free(n);
 }
 
