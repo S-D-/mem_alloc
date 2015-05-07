@@ -9,8 +9,7 @@
 #define BLK_MAX_POW2 11
 
 struct used_big_bh {
-    struct used_big_bh* prev;
-    struct used_big_bh* next; // holds isUsed bit
+    size_t prev_size; // holds isUsed bit
     size_t size;
 };
 typedef struct used_big_bh UsedBigBH;
@@ -40,8 +39,9 @@ typedef struct free_big_bh FreeBigBH;
 //typedef struct free_page FreePage;
 
 struct used_page_header {
+    size_t prev_size; // TODO mb make isUsed here - no
     struct used_page_header* next_ph;
-    short blocks_free;
+    //short blocks_free;
     void* first_block;
     char usage_mask[];
 };
@@ -50,7 +50,8 @@ typedef struct used_page_header UsedPH;
 enum header_type {
     USED_PH,
     USED_PH32,
-    USED_BIG_BH
+    USED_BIG_BH,
+    FREE_BIG_BH
 };
 typedef enum header_type HeaderType;
 

@@ -231,7 +231,7 @@ void rbtree_delete(FreeBigBH *del_node)
         Node pred = maximum_node(n->rb_left);
 //        n->key   = pred->key;
 //        n->value = pred->value;
-        n->info = pred->info;
+        n->info = pred->info; // TODO fix it!
         n = pred;
     }
 
