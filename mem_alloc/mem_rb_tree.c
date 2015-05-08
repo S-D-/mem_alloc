@@ -119,8 +119,6 @@ static void insert_case5(Node n);
 
 void rbtree_insert(FreeBigBH* ins_node) 
 {
-    //printf("Inserting %p\n", ins_node);
-   // node inserted_node = new_node(key, value, RED, NULL, NULL);
     ins_node->rb_color = RED;
     ins_node->rb_left = ins_node->rb_right = NULL;
     if (*rb_root_pp == NULL) {
@@ -132,7 +130,6 @@ void rbtree_insert(FreeBigBH* ins_node)
             if (comp_result == 0) {
                 n->info = ins_node->info;
                 printf("ERROR: RB\n");
-                //n->value = value;
                 return;
             } else if (comp_result < 0) {
                 if (n->rb_left == NULL) {
@@ -223,10 +220,8 @@ static void delete_case4(Node n);
 static void delete_case5(Node n);
 static void delete_case6(Node n);
 
-// TODO fix dublicated values case.
 void rbtree_delete(FreeBigBH *del_node) 
 {
-    //printf("Deleting %p\n", del_node);
     Node child;
     Node n = del_node; //was Node n = lookup_node(del_node);
     Node pred = NULL;
@@ -234,10 +229,6 @@ void rbtree_delete(FreeBigBH *del_node)
     if (n->rb_left != NULL && n->rb_right != NULL) {
         /* Copy key/value from predecessor and then delete it instead */
         pred = maximum_node(n->rb_left);
-//        n->key   = pred->key;
-//        n->value = pred->value;
-        
-        //was: n->info = pred->info; // TODO fix it!
         n = pred;
     }
 
@@ -251,11 +242,9 @@ void rbtree_delete(FreeBigBH *del_node)
     if (n->rb_parent == NULL && child != NULL) // root should be black
         child->rb_color = BLACK;
     
-    //TODO check this:
     if (pred != NULL) {
         replace_node(del_node, pred);
     }
-    //free(n);
 }
 
 static void delete_case1(Node n) {

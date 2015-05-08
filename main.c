@@ -12,6 +12,7 @@ void test1()
     mem_free(mem_area1);
     printf("\nMemory dump\n");
     mem_dump();
+    
     mem_free(mem_area2);
     printf("\nMemory dump\n");
     mem_dump();
