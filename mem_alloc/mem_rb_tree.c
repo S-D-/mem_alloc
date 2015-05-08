@@ -1,5 +1,6 @@
 #include "mem_rb_tree.h"
 #include <assert.h>
+#include <stdio.h>
 
 typedef FreeBigBH* Node;
 static const RBColor BLACK = false;
@@ -21,7 +22,7 @@ static int node_cmp(Node n1, Node n2)
     }
     return n1->info.size > n2->info.size? 1: -1;
 }
-mem_free(addr);
+
 static Node grandparent(Node n) {
     assert (n != NULL);
     assert (n->rb_parent != NULL); /* Not the root node */
@@ -45,21 +46,21 @@ static Node uncle(Node n) {
     return sibling(n->rb_parent);
 }
 
-static Node lookup_node(Node key_node) {
-    Node n = *rb_root_pp;
-    while (n != NULL) {
-        int comp_result = node_cmp(key_node, n);
-        if (comp_result == 0) {
-            return n;
-        } else if (comp_result < 0) {
-            n = n->rb_left;
-        } else {
-            assert(comp_result > 0);
-            n = n->rb_right;
-        }
-    }
-    return n;
-}
+//static Node lookup_node(Node key_node) {
+//    Node n = *rb_root_pp;
+//    while (n != NULL) {
+//        int comp_result = node_cmp(key_node, n);
+//        if (comp_result == 0) {
+//            return n;
+//        } else if (comp_result < 0) {
+//            n = n->rb_left;
+//        } else {
+//            assert(comp_result > 0);
+//            n = n->rb_right;
+//        }
+//    }
+//    return n;
+//}
 
 FreeBigBH *rbtree_lookup(size_t size) 
 {
@@ -118,6 +119,7 @@ static void insert_case5(Node n);
 
 void rbtree_insert(FreeBigBH* ins_node) 
 {
+    //printf("Inserting %p\n", ins_node);
    // node inserted_node = new_node(key, value, RED, NULL, NULL);
     ins_node->rb_color = RED;
     ins_node->rb_left = ins_node->rb_right = NULL;
@@ -224,6 +226,7 @@ static void delete_case6(Node n);
 // TODO fix dublicated values case.
 void rbtree_delete(FreeBigBH *del_node) 
 {
+    //printf("Deleting %p\n", del_node);
     Node child;
     Node n = del_node; //was Node n = lookup_node(del_node);
     Node pred = NULL;
