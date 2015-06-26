@@ -42,7 +42,6 @@ static Node sibling(Node n) {
 static Node uncle(Node n) {
     assert (n != NULL);
     assert (n->rb_parent != NULL); /* Root node has no uncle */
-    printf("n = %p, color = %x, parent = %p\n", n, n->rb_color, n->rb_parent);
     assert (n->rb_parent->rb_parent != NULL); /* Children of root have no uncle */
     return sibling(n->rb_parent);
 }
@@ -120,10 +119,6 @@ static void insert_case5(Node n);
 
 void rbtree_insert(FreeBigBH* ins_node) 
 {
-    printf("INSERTING %p\n", ins_node);
-    printf("\nThe TreeI:\n");
-    rbtree_print(*rb_root_pp);
-    printf("\n");
     ins_node->rb_color = RED;
     ins_node->rb_left = ins_node->rb_right = NULL;
     if (*rb_root_pp == NULL) {
@@ -156,9 +151,6 @@ void rbtree_insert(FreeBigBH* ins_node)
         ins_node->rb_parent = n;
     }
     insert_case1(ins_node);
-    printf("\nThe TreeI2:\n");
-    rbtree_print(*rb_root_pp);
-    printf("\n");
 }
 
 static void insert_case1(Node n) {
@@ -230,10 +222,6 @@ static void delete_case6(Node n);
 
 void rbtree_delete(FreeBigBH *del_node) 
 {
-    printf("DELETING %p\n", del_node);
-    printf("\nThe TreeD:\n");
-    rbtree_print(*rb_root_pp);
-    printf("\n");
     Node child;
     Node n = del_node; //was Node n = lookup_node(del_node);
     Node pred = NULL;
@@ -254,9 +242,6 @@ void rbtree_delete(FreeBigBH *del_node)
     if (n->rb_parent == NULL && child != NULL) // root should be black
         child->rb_color = BLACK;
     
-    printf("\nThe TreeD2.5:\n");
-    rbtree_print(*rb_root_pp);
-    printf("\n");
     if (pred != NULL) {
         replace_node(del_node, pred);
         pred->rb_left = del_node->rb_left;
@@ -269,9 +254,6 @@ void rbtree_delete(FreeBigBH *del_node)
             del_node->rb_right->rb_parent = pred;
         }
     }
-    printf("\nThe TreeD2:\n");
-    rbtree_print(*rb_root_pp);
-    printf("\n");
 }
 
 static void delete_case1(Node n) {

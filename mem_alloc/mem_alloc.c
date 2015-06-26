@@ -227,6 +227,9 @@ void* mem_alloc(size_t size)
             first_block = (char*) fbh + block_len;
         } else {
             new_ph = mem_alloc(sizeof(UsedPH) + mask_len);
+            if (new_ph == NULL) {
+                return NULL;
+            }
             new_ph->usage_mask[0] = 1;
             first_block = (char*) fbh;
         }
@@ -275,6 +278,20 @@ void* mem_realloc(void *addr, size_t size)
     switch (h_type) {
     case USED_BIG_BH:;
         UsedBigBH* bh = pg_start;
+        if (bh->size >= size + PAGE_SIZE) {
+            size_t free_bh_sz = (bh->size - size) / PAGE_SIZE * PAGE_SIZE; // rounding
+            void* next_blk_addr = (char*) bh + bh->size;
+            set_nxt_blk_prev_size(free_bh_sz, next_blk_addr);
+            bh->size -= free_bh_sz;
+            FreeBigBH* free_bh = (FreeBigBH*) ((char*) bh + bh->size);
+            free_bh->info.prev_size = bh->size;
+            free_bh->info.size = free_bh_sz;
+            rbtree_insert(free_bh);
+            return addr;
+        }
+        if (bh->size >= size) {
+            return addr;
+        }
         void* next_addr = (char*) bh + bh->size;
         if ((char*) next_addr < mem_start + PAGE_NUM * PAGE_SIZE) {
             size_t next_idx = page_idx(next_addr);
@@ -293,12 +310,22 @@ void* mem_realloc(void *addr, size_t size)
             }
         }
         new_addr = mem_alloc(size);
+        if (new_addr == NULL) {
+            return NULL;
+        }
         memcpy(new_addr, addr, bh->size);
         mem_free(addr);
         return new_addr;
     case USED_PH:;
         UsedPH* old_ph = (UsedPH*) (header_ptrs[pg_idx] & ~(intptr_t)3);
+        size_t old_ph_sz = 1 << old_ph->blk_size_pow2;
+        if (old_ph_sz >= size) {
+            return addr;
+        }
         new_addr = mem_alloc(size);
+        if (new_addr == NULL) {
+            return NULL;
+        }
         if ((void*) old_ph == pg_start) {
             memcpy(new_addr, addr, PAGE_SIZE - sizeof(UsedPH));
         } else {
@@ -315,7 +342,6 @@ void* mem_realloc(void *addr, size_t size)
 
 static void free_block(void* addr, size_t block_size, size_t prev_size)
 {
-    printf("Freeing block %p\n",addr);
     size_t blk_idx = page_idx(addr);
     void* prev_addr = (char*) addr - prev_size;
     size_t prev_idx;
@@ -336,7 +362,6 @@ static void free_block(void* addr, size_t block_size, size_t prev_size)
     size_t new_size = block_size;
     FreeBigBH* new_blk = addr;
     if (hasPrev) {
-        printf(" hasPrev %p\n", prev_addr);
         switch (prev_h_type) {
         case FREE_BIG_BH:
             rbtree_delete(prev_addr);
@@ -356,7 +381,6 @@ static void free_block(void* addr, size_t block_size, size_t prev_size)
     }
     new_blk->info.size = new_size;
     if (hasNext) {
-        printf(" hasNext %p\n", next_addr);
         switch (next_h_type) {
         case FREE_BIG_BH:
             rbtree_delete(next_addr);
@@ -366,40 +390,17 @@ static void free_block(void* addr, size_t block_size, size_t prev_size)
             if (next_next_blk >= mem_start + PAGE_NUM*PAGE_SIZE) {
                 break;
             }
-            size_t next_next_idx = page_idx(next_next_blk);
-            HeaderType next_next_h_type = header_ptrs[next_next_idx] & 3;
-            void* next_next_addr = (void*) (header_ptrs[next_next_idx] & ~(intptr_t)3);
-            switch (next_next_h_type) {
-            case FREE_BIG_BH:
-                printf("WARNING!!! %p\n", next_next_addr);
-            case USED_BIG_BH:
-                ((UsedBigBH*) next_next_addr)->prev_size = new_size;
-                break;
-            case USED_PH:
-                ((UsedPH*) next_next_addr)->prev_size = new_size;
-                break;
-            default:
-                break;
-            }
+            set_nxt_blk_prev_size(new_size, next_next_blk);
             break;
         case USED_BIG_BH:
-            ((UsedBigBH*) next_addr)->prev_size = new_size;
-            break;
         case USED_PH:
-            ((UsedPH*) next_addr)->prev_size = new_size;
-            printf("USED PH: %p, prev_size: %zu, prev_addr: %p\n", next_addr, 
-                   ((UsedPH*) next_addr)->prev_size, 
-                   (char*) next_addr - ((UsedPH*) next_addr)->prev_size);
+            set_nxt_blk_prev_size(new_size, next_addr);
             break;
         default:
             break;
         }
     }
-    printf("NEW SIZE: %zu\n", new_size);
-    printf("\n");
     rbtree_insert(new_blk);
-    printf("FREEING BLK. Mem dump\n");
-    mem_dump();
 }
 
 void mem_free(void *addr)
@@ -457,7 +458,7 @@ void mem_dump(void)
         case USED_PH:;
             UsedPH* ph = (UsedPH*) (header_ptrs[i] & ~(intptr_t)3);
             char* used_ph_addr = mem_start+i*PAGE_SIZE;
-            printf("UsedPH:\t%p blk_size: %u, prev_addr: %p usage_mask: ", used_ph_addr, 1 << ph->blk_size_pow2, used_ph_addr - ph->prev_size);
+            printf("UsedPH:\t%p blk_size: %u usage_mask: ", used_ph_addr, 1 << ph->blk_size_pow2);
             size_t mask_len = PAGE_SIZE / (1 << ph->blk_size_pow2) /8;
             for (int i = 0; i < mask_len; ++i) {
                 printf("%x ", ph->usage_mask[i]);
@@ -473,7 +474,7 @@ void mem_dump(void)
             break;
         case FREE_BIG_BH:;
             FreeBigBH* free_bh = (FreeBigBH*) (header_ptrs[i] & ~(intptr_t)3);
-            printf("FreeBigBH:\t%p, size: %zu, prev_addr: %p\n", free_bh, free_bh->info.size, (char*)free_bh - free_bh->info.prev_size);
+            printf("FreeBigBH:\t%p, size: %zu\n", free_bh, free_bh->info.size);
             addr += free_bh->info.size;
             break;
         default:
