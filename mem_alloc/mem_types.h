@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define PAGE_NUM 100
+#define PAGE_NUM 1000
 #define PAGE_SIZE 4096
 #define BLK_MAX_POW2 11
 

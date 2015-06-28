@@ -120,7 +120,7 @@ static void insert_case5(Node n);
 void rbtree_insert(FreeBigBH* ins_node) 
 {
     ins_node->rb_color = RED;
-    ins_node->rb_left = ins_node->rb_right = NULL;
+    ins_node->rb_left = ins_node->rb_right = ins_node->rb_parent= NULL;
     if (*rb_root_pp == NULL) {
         *rb_root_pp = ins_node;
     } else {

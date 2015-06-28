@@ -11,7 +11,7 @@
 //static void* page_pointers[PAGE_NUM];
 static char* mem_start = NULL;
 //static UsedPH* formated_page_lists[BLK_MAX_POW2] = {NULL};
-static size_t formated_page_idxs[BLK_MAX_POW2] = {[0 ... BLK_MAX_POW2-1] = SIZE_MAX};
+static size_t formated_page_idxs[BLK_MAX_POW2+1] = {[0 ... BLK_MAX_POW2] = SIZE_MAX};
 static FreeBigBH* free_big_bhs_root = NULL;
 static intptr_t header_ptrs[PAGE_NUM];
 
@@ -42,7 +42,7 @@ uint nextPow2(size_t v)
  * @brief setBit
  * @param mask
  * @param mask_len
- * @return number of setted bit.
+ * @return number of bit that was set.
  */
 size_t setBit(char* mask, size_t mask_len)
 {
@@ -52,6 +52,21 @@ size_t setBit(char* mask, size_t mask_len)
             break;
         }
     }
+//    int bits_left = bits_num - (bits_num / 8);
+//    if (bits_left) {
+//        signed char mask2 = 0xFF;
+//        mask2 >>= 8 - bits_left;
+//        if((mask[i] & mask2) != mask2) {
+//            size_t res = i * 8;
+//            char m = 1;
+//            while((mask[i] & m) == m) {
+//                m <<= 1;
+//                res++;
+//            }
+//            mask[i] |= m;
+//            return res;
+//        }
+//    }
     assert(i != mask_len);
     char m;
     size_t res = i * 8;
@@ -82,11 +97,20 @@ void clrBit(char* mask, size_t bit_idx)
     mask[i] &= ~clr_mask;
 }
 
-bool isFree32(char* usage_mask, size_t mask_len)
+bool isFree32(char* usage_mask, const size_t bits_num)
 {
     char mask = 0;
-    for (int i = 1; i < mask_len; ++i) {
+    int i;
+    for (i = 1; i < bits_num / 8; ++i) {
         mask |= usage_mask[i];
+    }
+    int bits_left = bits_num - (bits_num / 8) * 8;
+    if (bits_left) {
+        unsigned char mask2 = 0xFF;
+        unsigned char mask3 = 0xFF;
+        mask2 <<= bits_left;
+        mask3 >>= 8 - bits_left;
+        mask |= (usage_mask[i] | mask2) & mask3;
     }
     if (mask) {
         return false;
@@ -98,11 +122,20 @@ bool isFree32(char* usage_mask, size_t mask_len)
     return false;
 }
 
-bool isFree(char* usage_mask, size_t mask_len)
+bool isFree(char* usage_mask, const size_t bits_num)
 {
     char mask = 0;
-    for (int i = 0; i < mask_len; ++i) {
+    int i;
+    for (i = 0; i < bits_num / 8; ++i) {
         mask |= usage_mask[i];
+    }
+    int bits_left = bits_num - (bits_num / 8) * 8;
+    if (bits_left) {
+        char mask2 = 0xFF;
+        unsigned char mask3 = 0xFF;
+        mask2 <<= bits_left;
+        mask3 >>= 8 - bits_left;
+        mask |= (usage_mask[i] | mask2) & mask3;
     }
     if (mask) {
         return false;
@@ -110,11 +143,20 @@ bool isFree(char* usage_mask, size_t mask_len)
     return true;
 }
 
-bool isFull(char* usage_mask, size_t mask_len)
+bool isFull(char* usage_mask, const size_t bits_num)
 {
     char mask = -1;
-    for (int i = 0; i < mask_len; ++i) {
+    int i;
+    for (i = 0; i < bits_num / 8; ++i) {
         mask &= usage_mask[i];
+    }
+    int bits_left = bits_num - (bits_num / 8) * 8;
+    if (bits_left) {
+        signed char mask2 = 0xFF;
+        char mask3 = 0xFF;
+        mask2 >>= 8 - bits_left;
+        mask3 <<= bits_left;
+        mask &= (usage_mask[i] & mask2) | mask3;
     }
     if (mask == -1) {
         return true;
@@ -189,14 +231,16 @@ void* mem_alloc(size_t size)
     block_len <<= pow2;
     if (size <= PAGE_SIZE / 2) {
         size_t ph_idx = formated_page_idxs[pow2];
-        size_t mask_len = PAGE_SIZE / block_len / 8;
+        size_t blocks_num = PAGE_SIZE / block_len;
+        size_t mask_len = (blocks_num + 7) / 8;
         if (ph_idx != SIZE_MAX) {
             UsedPH* ph = (UsedPH*) (header_ptrs[ph_idx] & ~(intptr_t)3);
             size_t block_idx = setBit(ph->usage_mask, mask_len);
-            if (isFull(ph->usage_mask, mask_len)){
+            if (isFull(ph->usage_mask, blocks_num)){
                 formated_page_idxs[pow2] = ph->next_ph_idx;
             }
-            return mem_start + ph_idx * PAGE_SIZE + block_len * block_idx;
+            void* result = mem_start + ph_idx * PAGE_SIZE + block_len * block_idx;
+            return result;
         }
         if (free_big_bhs_root == NULL) {
             return NULL; // no memory left
@@ -271,6 +315,9 @@ void* mem_alloc(size_t size)
 
 void* mem_realloc(void *addr, size_t size)
 {
+    if (addr == NULL) {
+        return mem_alloc(size);
+    }
     void* pg_start = get_page_start(addr);
     size_t pg_idx = page_idx(pg_start);
     HeaderType h_type = header_ptrs[pg_idx] & 3;
@@ -342,6 +389,10 @@ void* mem_realloc(void *addr, size_t size)
 
 static void free_block(void* addr, size_t block_size, size_t prev_size)
 {
+//    printf("\nFREEING %p\nMem dump before\n", addr);
+//    mem_dump();
+//    printf("The tree\n");
+//    rbtree_print(free_big_bhs_root);
     size_t blk_idx = page_idx(addr);
     void* prev_addr = (char*) addr - prev_size;
     size_t prev_idx;
@@ -369,8 +420,9 @@ static void free_block(void* addr, size_t block_size, size_t prev_size)
             new_blk = prev_addr;
             header_ptrs[prev_idx] = (intptr_t) new_blk | FREE_BIG_BH;
             break;
+        case USED_BIG_BH:
         case USED_PH:
-            new_blk->info.prev_size = PAGE_SIZE;
+            new_blk->info.prev_size = prev_size;
             header_ptrs[blk_idx] = (intptr_t) new_blk | FREE_BIG_BH;
             break;
         default:
@@ -401,10 +453,39 @@ static void free_block(void* addr, size_t block_size, size_t prev_size)
         }
     }
     rbtree_insert(new_blk);
+//    printf("Mem dump after\n");
+//    mem_dump();
+//    printf("The tree\n");
+//    rbtree_print(free_big_bhs_root);
+//    printf("\n");
+}
+
+size_t formatted_prev_idx(int pow2, size_t pg_idx)
+{
+    size_t prev_idx = SIZE_MAX;
+    for (size_t i = formated_page_idxs[pow2]; i != SIZE_MAX;
+         i = ((UsedPH*) (header_ptrs[i] & ~(intptr_t)3))->next_ph_idx) {
+        if (i >= PAGE_NUM) {
+            fflush(stdout);
+            printf("Prev idx!\n");
+        }
+        if (pg_idx == i) {
+            return prev_idx;
+        }
+        prev_idx = i;
+    }
+    assert(prev_idx == SIZE_MAX);
+    printf("ERROR? at formatted_prev_idx, line: %i\n", __LINE__);
+    mem_dump();
+    fflush(stdout);
+    return SIZE_MAX-1;
 }
 
 void mem_free(void *addr)
 {
+    if (addr == NULL) {
+        return;
+    }
     intptr_t test = (intptr_t) addr & 3;
     if (test != 0) {
         fprintf(stderr, "ERROR: Incorrect address for mem_free()!\n");
@@ -418,11 +499,22 @@ void mem_free(void *addr)
         size_t blk_size = 1;
         blk_size <<= ph->blk_size_pow2;
         int block_idx = ((char*) addr - (char*) page_start) / blk_size;
-        size_t mask_len = PAGE_SIZE / blk_size / 8;
-        bool was_full = isFull(ph->usage_mask, mask_len);
+        size_t blocks_num = PAGE_SIZE / blk_size;
+        bool was_full = isFull(ph->usage_mask, blocks_num);
         clrBit(ph->usage_mask, block_idx);
-        if ((blk_size == 32 && isFree32(ph->usage_mask, mask_len))
-                || (blk_size != 32 && isFree(ph->usage_mask, mask_len))) {
+        if ((blk_size == 32 && isFree32(ph->usage_mask, blocks_num))
+                || (blk_size != 32 && isFree(ph->usage_mask, blocks_num))) {
+            //TODO check this
+            /* remove from formatted pages list */
+            size_t f_prev_idx = formatted_prev_idx(ph->blk_size_pow2, pg_idx);
+            if (f_prev_idx == SIZE_MAX - 1) {
+                formated_page_idxs[ph->blk_size_pow2] = SIZE_MAX;
+            } else if (f_prev_idx != SIZE_MAX) {
+                UsedPH* list_prev_ph = (UsedPH*) (header_ptrs[f_prev_idx] & ~(intptr_t)3);
+                list_prev_ph->next_ph_idx = ph->next_ph_idx;
+            } else { // if it's the head of the list
+                formated_page_idxs[ph->blk_size_pow2] = ph->next_ph_idx;
+            }
             free_block(page_start, PAGE_SIZE, ph->prev_size);
             if (blk_size != 32) {
                 mem_free(ph);
@@ -458,10 +550,11 @@ void mem_dump(void)
         case USED_PH:;
             UsedPH* ph = (UsedPH*) (header_ptrs[i] & ~(intptr_t)3);
             char* used_ph_addr = mem_start+i*PAGE_SIZE;
-            printf("UsedPH:\t%p blk_size: %u usage_mask: ", used_ph_addr, 1 << ph->blk_size_pow2);
-            size_t mask_len = PAGE_SIZE / (1 << ph->blk_size_pow2) /8;
+            size_t block_size = 1 << ph->blk_size_pow2;
+            printf("UsedPH:\t%p blk_size: %u usage_mask: ", used_ph_addr, block_size);
+            size_t mask_len = (PAGE_SIZE / block_size + 7) /8;
             for (int i = 0; i < mask_len; ++i) {
-                printf("%x ", ph->usage_mask[i]);
+                printf("0x%1x ", ph->usage_mask[i]);
             }
             printf("\n");
             size_t ph_size = PAGE_SIZE;
