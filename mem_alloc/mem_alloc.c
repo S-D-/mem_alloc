@@ -272,7 +272,7 @@ void* mem_alloc(size_t size)
         } else {
             new_ph = mem_alloc(sizeof(UsedPH) + mask_len);
             if (new_ph == NULL) {
-                return NULL;
+                return NULL; // TODO rollback
             }
             new_ph->usage_mask[0] = 1;
             first_block = (char*) fbh;
@@ -334,6 +334,8 @@ void* mem_realloc(void *addr, size_t size)
             free_bh->info.prev_size = bh->size;
             free_bh->info.size = free_bh_sz;
             rbtree_insert(free_bh);
+            size_t free_bh_idx = page_idx(free_bh);
+            header_ptrs[free_bh_idx] = (intptr_t) free_bh | FREE_BIG_BH;
             return addr;
         }
         if (bh->size >= size) {
@@ -365,23 +367,25 @@ void* mem_realloc(void *addr, size_t size)
         return new_addr;
     case USED_PH:;
         UsedPH* old_ph = (UsedPH*) (header_ptrs[pg_idx] & ~(intptr_t)3);
-        size_t old_ph_sz = 1 << old_ph->blk_size_pow2;
-        if (old_ph_sz >= size) {
+        size_t old_ph_blk_sz = 1 << old_ph->blk_size_pow2;
+        if (old_ph_blk_sz >= size) {
             return addr;
         }
         new_addr = mem_alloc(size);
         if (new_addr == NULL) {
             return NULL;
         }
-        if ((void*) old_ph == pg_start) {
-            memcpy(new_addr, addr, PAGE_SIZE - sizeof(UsedPH));
-        } else {
-            memcpy(new_addr, addr, PAGE_SIZE);
-        }
+//        if ((void*) old_ph == pg_start) {
+//            memcpy(new_addr, addr, PAGE_SIZE - sizeof(UsedPH));
+//        } else {
+//            memcpy(new_addr, addr, PAGE_SIZE);
+//        }
+        memcpy(new_addr, addr, old_ph_blk_sz);
         mem_free(addr);
         return new_addr;
     default:
-        fprintf(stderr, "ERROR: in mem_realloc()");
+        printf("ERROR: in mem_realloc()\n");
+        fflush(stdout);
         return NULL;
     }
     
@@ -504,7 +508,6 @@ void mem_free(void *addr)
         clrBit(ph->usage_mask, block_idx);
         if ((blk_size == 32 && isFree32(ph->usage_mask, blocks_num))
                 || (blk_size != 32 && isFree(ph->usage_mask, blocks_num))) {
-            //TODO check this
             /* remove from formatted pages list */
             size_t f_prev_idx = formatted_prev_idx(ph->blk_size_pow2, pg_idx);
             if (f_prev_idx == SIZE_MAX - 1) {
@@ -529,7 +532,8 @@ void mem_free(void *addr)
         free_block(bh, bh->size, bh->prev_size);
         break;
     case FREE_BIG_BH:
-        fprintf(stdout, "ERROR: double free!\n");
+        printf("ERROR: double free!\n");
+        fflush(stdout);
         break;
     default:
         break;
@@ -545,6 +549,9 @@ void mem_dump(void)
         return;
     }
     while (true) {
+        if (i == 115) {
+            printf("115...\n");
+        }
         HeaderType h_type = header_ptrs[i] & 3;
         switch (h_type) {
         case USED_PH:;
@@ -562,13 +569,15 @@ void mem_dump(void)
             break;
         case USED_BIG_BH:;
             UsedBigBH* big_bh = (UsedBigBH*) (header_ptrs[i] & ~(intptr_t)3);
-            printf("UsedBigBH:\t%p\n", big_bh);
+            printf("UsedBigBH:\t%p, size: %zu\n", big_bh, big_bh->size);
             addr += big_bh->size;
+            assert(big_bh->size != 0);
             break;
         case FREE_BIG_BH:;
             FreeBigBH* free_bh = (FreeBigBH*) (header_ptrs[i] & ~(intptr_t)3);
             printf("FreeBigBH:\t%p, size: %zu\n", free_bh, free_bh->info.size);
             addr += free_bh->info.size;
+            assert(free_bh->info.size != 0);
             break;
         default:
             break;
@@ -577,6 +586,7 @@ void mem_dump(void)
             return;
         }
         i = page_idx(addr);
+        fflush(stdout);
     }
 }
 
