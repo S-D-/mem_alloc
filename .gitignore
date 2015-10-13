@@ -1,2 +1,5 @@
 CMakeLists.txt.user
 backup/
+.dir-locals.el
+*~
+tags

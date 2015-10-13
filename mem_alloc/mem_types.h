@@ -7,6 +7,7 @@
 #define PAGE_NUM 1000
 #define PAGE_SIZE 4096
 #define BLK_MAX_POW2 11
+#define BLK_MIN_POW2 4
 
 struct used_big_bh {
     size_t prev_size;

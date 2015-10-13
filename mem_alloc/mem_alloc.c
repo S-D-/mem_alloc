@@ -28,9 +28,19 @@ u_int32_t roundToPow2(u_int32_t v)
     return v;
 }
 
-uint nextPow2(size_t v)
+//uint nextPow2(size_t v)
+//{
+//    uint r = 1;
+//    while (v >>= 1)
+//    {
+//      r++;
+//    }
+//    return r;
+//}
+
+u_int32_t count_pow2(u_int32_t v)
 {
-    uint r = 1;
+    uint r = 0;
     while (v >>= 1)
     {
       r++;
@@ -231,9 +241,18 @@ void* mem_alloc(size_t size)
             return NULL;
         }
     }
-    uint pow2 = nextPow2(size);
-    size_t block_len = 1;
-    block_len <<= pow2;
+    if (size == 0) {
+        return NULL;
+    }
+//    uint pow2 = nextPow2(size);
+    size_t block_len = roundToPow2(size);
+    uint pow2 = count_pow2(block_len);
+    if (pow2 < BLK_MIN_POW2) {
+        pow2 = BLK_MIN_POW2;
+        block_len = 1 << BLK_MIN_POW2;
+    }
+//    size_t block_len = 1;
+//    block_len <<= pow2;
     if (size <= PAGE_SIZE / 2) {
         size_t ph_idx = formated_page_idxs[pow2];
         size_t blocks_num = PAGE_SIZE / block_len;
@@ -330,6 +349,9 @@ void* mem_realloc(void *addr, size_t size)
     if (addr == NULL) {
         return mem_alloc(size);
     }
+    if (size == 0) {
+        return NULL;
+    }
     void* pg_start = get_page_start(addr);
     size_t pg_idx = page_idx(pg_start);
     HeaderType h_type = header_ptrs[pg_idx] & 3;
@@ -337,8 +359,8 @@ void* mem_realloc(void *addr, size_t size)
     switch (h_type) {
     case USED_BIG_BH:;
         UsedBigBH* bh = pg_start;
-        if (bh->size >= size + PAGE_SIZE) {
-            size_t free_bh_sz = (bh->size - size) / PAGE_SIZE * PAGE_SIZE; // rounding
+        if (bh->size >= size + sizeof(UsedBigBH) + PAGE_SIZE) {
+            size_t free_bh_sz = (bh->size - size - sizeof(UsedBigBH)) / PAGE_SIZE * PAGE_SIZE; // rounding
             bh->size -= free_bh_sz;
             FreeBigBH* free_bh = (FreeBigBH*) ((char*) bh + bh->size);
             free_bh->info.prev_size = bh->size;
@@ -371,7 +393,7 @@ void* mem_realloc(void *addr, size_t size)
             header_ptrs[free_bh_idx] = (intptr_t) free_bh | FREE_BIG_BH;
             return addr; // TODO add call to free_block mb.
         }
-        if (bh->size >= size) {
+        if (bh->size >= size + sizeof(UsedBigBH)) {
             return addr;
         }
         void* next_addr = (char*) bh + bh->size;
@@ -419,7 +441,7 @@ void* mem_realloc(void *addr, size_t size)
         if (new_addr == NULL) {
             return NULL;
         }
-        memcpy(new_addr, addr, bh->size);
+        memcpy(new_addr, addr, bh->size - sizeof(UsedBigBH));
         mem_free(addr);
         return new_addr;
     case USED_PH:;
@@ -463,12 +485,11 @@ static void free_block(void* addr, size_t block_size, size_t prev_size)
         prev_idx = page_idx(prev_addr);
         prev_h_type = header_ptrs[prev_idx] & 3;
     }
-    size_t next_idx;
     void* next_addr = (char*) addr + block_size;
     bool hasNext = (char*) next_addr < mem_start + PAGE_NUM*PAGE_SIZE;
     HeaderType next_h_type;
     if (hasNext) {
-        next_idx = page_idx(next_addr);
+        size_t next_idx = page_idx(next_addr);
         next_h_type = header_ptrs[next_idx] & 3;
     }
     size_t new_size = block_size;
@@ -607,16 +628,13 @@ void mem_dump(void)
     }
     bool prev_was_free = false;
     while (true) {
-        if (i == 115) {
-            printf("115...\n");
-        }
         HeaderType h_type = header_ptrs[i] & 3;
         switch (h_type) {
         case USED_PH:;
             UsedPH* ph = (UsedPH*) (header_ptrs[i] & ~(intptr_t)3);
             char* used_ph_addr = mem_start+i*PAGE_SIZE;
             size_t block_size = 1 << ph->blk_size_pow2;
-            printf("UsedPH:\t%p blk_size: %u usage_mask: ", used_ph_addr, block_size);
+            printf("UsedPH:\t%p blk_size: %zu usage_mask: ", used_ph_addr, block_size);
             size_t mask_len = (PAGE_SIZE / block_size + 7) /8;
             for (int i = 0; i < mask_len; ++i) {
                 printf("0x%1x ", ph->usage_mask[i]);
@@ -659,4 +677,12 @@ void mem_dispose(void)
     if (mem_start != NULL) {
         munmap(mem_start, PAGE_NUM*PAGE_SIZE);
     }
+}
+
+HeaderType mem_get_type(void* addr)
+{
+    void* page_start = get_page_start(addr);
+    size_t pg_idx = page_idx(page_start);
+    HeaderType h_type = header_ptrs[pg_idx] & 3;
+    return h_type;
 }

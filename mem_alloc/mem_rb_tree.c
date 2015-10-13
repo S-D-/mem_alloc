@@ -9,6 +9,7 @@ static Node* rb_root_pp;
 
 void set_rb_root_var(FreeBigBH** root_pp)
 {
+    int test;
     rb_root_pp = root_pp;
 }
 

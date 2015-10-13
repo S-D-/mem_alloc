@@ -31,7 +31,7 @@ struct mem_area_info {
 char hash_array(char* array, size_t size)
 {
     char res = 0;
-    for (int i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
         res ^= array[i];
     }
     return res;
@@ -45,6 +45,8 @@ char hash_array(char* array, size_t size)
  * 1435502300 - 28 
  * 1435522608 - 1000, 3*PAGE_SIZE
  * 1435600959 - 1000, 3*PAGE_SIZE
+ * 1435611108 - 10000, 3*PAGE_SIZE/2
+ * 1435654187
  * prob 0.5 - 100, 3*PAGE_SIZE
  */
 
@@ -60,7 +62,7 @@ void testHash(struct mem_area_info* pointers_info, int idx)
 
 void fill_area(struct mem_area_info* info)
 {
-    for (int i = 0; i < info->size; ++i) {
+    for (size_t i = 0; i < info->size; ++i) {
         ((char*) info->mem_area)[i] = rand();
     }
 }
@@ -71,23 +73,37 @@ void test2(void)
     const int max_size = 3 * PAGE_SIZE / 2;
     struct mem_area_info pointers_info[PTRS_NUM] = {{0}};
     uint seed = time(NULL);
-    srand(seed);
+    srand(1435654187);
     printf("SEED: %u\n", seed);
-    for (int i = 0; i < 1000; ++i) {
-        printf("Memory dump %i\n", i);
-        mem_dump();
+    fflush(stdout);
+    for (int i = 0; i < 100000; ++i) {
+        printf("i = %i\n", i);
+        if (i > 5200) {
+            printf("Memory dump %i\n", i);
+            mem_dump();
+        }
         int r = rand();
         int idx = rand() % PTRS_NUM;
         if (r > RAND_MAX / 2) {
             if (pointers_info[idx].mem_area == NULL) {
                 int size = rand() % max_size;
+                printf("mallocing... %i\n", size);
+                fflush(stdout);
                 pointers_info[idx].mem_area = mem_alloc(size);
+//                if (pointers_info[idx].mem_area == 0xf62b3198 && size == 8) {
+//                    printf("Memory dump\n");
+//                    mem_dump();
+//                    fflush(stdout);
+//                    if (mem_get_type(pointers_info[idx].mem_area) == FREE_BIG_BH) {
+//                        printf("hmm...\n");
+//                    }
+//                }
                 if (pointers_info[idx].mem_area != NULL) {
                     pointers_info[idx].size = size;
                     fill_area(&pointers_info[idx]);
                     pointers_info[idx].hash = hash_array(pointers_info[idx].mem_area, size);
                 }
-                printf("malloc %zu\n", size);
+                printf("malloc %i\n", size);
             } else {
                 if (pointers_info[idx].mem_area != NULL) {
                     testHash(pointers_info, idx);
@@ -102,7 +118,17 @@ void test2(void)
                 testHash(pointers_info, idx);
             }
             void* new_ptr = mem_realloc(pointers_info[idx].mem_area, size);
-            printf("realloc %p, size = %zu\n", pointers_info[idx].mem_area, size);
+            printf("realloc %p, size = %i\n", pointers_info[idx].mem_area, size);
+            fflush(stdout);
+//            if (new_ptr == 0xf62b3198 && size == 8) { //0xf65a6008
+//                printf("Memory dump\n");
+//                mem_dump();
+//                printf("hmm...\n");
+//                fflush(stdout);
+//                if (mem_get_type(new_ptr) == FREE_BIG_BH) {
+//                    printf("hmm...\n");
+//                }
+//            }
             if (new_ptr == NULL) {
                 mem_free(pointers_info[idx].mem_area);
                 printf("free2\n");
@@ -114,6 +140,7 @@ void test2(void)
                 pointers_info[idx].hash = hash_array(new_ptr, size);
             }
         }
+        fflush(stdout);
     }
     printf("Memory dump\n");
     mem_dump();
