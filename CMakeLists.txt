@@ -1,4 +1,4 @@
-project(OCPLab2)
+project(mem_alloc)
 cmake_minimum_required(VERSION 2.8)
 aux_source_directory(. SRC_LIST)
 aux_source_directory(mem_alloc SRC_LIST)

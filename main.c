@@ -37,19 +37,6 @@ char hash_array(char* array, size_t size)
     return res;
 }
 
-/* 1435346457 - 4
- * 1435443214 - 10
- * 1435485050 - 50
- * 1435499681 - 300
- * realloc:
- * 1435502300 - 28 
- * 1435522608 - 1000, 3*PAGE_SIZE
- * 1435600959 - 1000, 3*PAGE_SIZE
- * 1435611108 - 10000, 3*PAGE_SIZE/2
- * 1435654187
- * prob 0.5 - 100, 3*PAGE_SIZE
- */
-
 void testHash(struct mem_area_info* pointers_info, int idx)
 {
     char hash = hash_array(pointers_info[idx].mem_area, pointers_info[idx].size);
@@ -73,10 +60,10 @@ void test2(void)
     const int max_size = 3 * PAGE_SIZE / 2;
     struct mem_area_info pointers_info[PTRS_NUM] = {{0}};
     uint seed = time(NULL);
-    srand(1435654187);
+    srand(seed);
     printf("SEED: %u\n", seed);
     fflush(stdout);
-    for (int i = 0; i < 100000; ++i) {
+    for (int i = 0; i < 10000; ++i) {
         printf("i = %i\n", i);
         if (i > 5200) {
             printf("Memory dump %i\n", i);
@@ -90,14 +77,6 @@ void test2(void)
                 printf("mallocing... %i\n", size);
                 fflush(stdout);
                 pointers_info[idx].mem_area = mem_alloc(size);
-//                if (pointers_info[idx].mem_area == 0xf62b3198 && size == 8) {
-//                    printf("Memory dump\n");
-//                    mem_dump();
-//                    fflush(stdout);
-//                    if (mem_get_type(pointers_info[idx].mem_area) == FREE_BIG_BH) {
-//                        printf("hmm...\n");
-//                    }
-//                }
                 if (pointers_info[idx].mem_area != NULL) {
                     pointers_info[idx].size = size;
                     fill_area(&pointers_info[idx]);
@@ -120,15 +99,6 @@ void test2(void)
             void* new_ptr = mem_realloc(pointers_info[idx].mem_area, size);
             printf("realloc %p, size = %i\n", pointers_info[idx].mem_area, size);
             fflush(stdout);
-//            if (new_ptr == 0xf62b3198 && size == 8) { //0xf65a6008
-//                printf("Memory dump\n");
-//                mem_dump();
-//                printf("hmm...\n");
-//                fflush(stdout);
-//                if (mem_get_type(new_ptr) == FREE_BIG_BH) {
-//                    printf("hmm...\n");
-//                }
-//            }
             if (new_ptr == NULL) {
                 mem_free(pointers_info[idx].mem_area);
                 printf("free2\n");

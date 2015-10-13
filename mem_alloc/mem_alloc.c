@@ -62,21 +62,6 @@ size_t setBit(char* mask, size_t mask_len)
             break;
         }
     }
-//    int bits_left = bits_num - (bits_num / 8);
-//    if (bits_left) {
-//        signed char mask2 = 0xFF;
-//        mask2 >>= 8 - bits_left;
-//        if((mask[i] & mask2) != mask2) {
-//            size_t res = i * 8;
-//            char m = 1;
-//            while((mask[i] & m) == m) {
-//                m <<= 1;
-//                res++;
-//            }
-//            mask[i] |= m;
-//            return res;
-//        }
-//    }
     assert(i != mask_len);
     char m;
     size_t res = i * 8;
@@ -228,10 +213,6 @@ void set_nxt_blk_prev_size(size_t size, void* next_blk)
         break;
     }
     
-//    size_t pg_idx = page_idx(next_blk);
-//    intptr_t ptr_mask = 3;
-//    UsedPH* ph = (UsedPH*) (header_ptrs[pg_idx] & ~ptr_mask);
-//    ph->prev_size = size; // works for UsedBigBH and FreeBigBH too
 }
 
 void* mem_alloc(size_t size)
@@ -342,10 +323,6 @@ void* mem_alloc(size_t size)
 
 void* mem_realloc(void *addr, size_t size)
 {
-//    if (addr == 0xf62b7008) {
-//        printf("The reallocing...\n");
-//        fflush(stdout);
-//    }
     if (addr == NULL) {
         return mem_alloc(size);
     }
@@ -418,12 +395,6 @@ void* mem_realloc(void *addr, size_t size)
                     header_ptrs[block_idx] = (intptr_t) rem_bh | FREE_BIG_BH;
                     bh->size = block_size;
                     
-                    
-//                    bh->size += next_bh->info.size;
-//                    void* next_next_addr = (char*) next_bh + next_bh->info.size;
-//                    if ((char*) next_next_addr < mem_start + PAGE_NUM * PAGE_SIZE) {
-//                        set_nxt_blk_prev_size(bh->size, next_next_addr);
-//                    }
                     return addr;
                 }
                 if (next_bh->info.size + bh->size >= size + sizeof(UsedBigBH)) {
@@ -454,11 +425,6 @@ void* mem_realloc(void *addr, size_t size)
         if (new_addr == NULL) {
             return NULL;
         }
-//        if ((void*) old_ph == pg_start) {
-//            memcpy(new_addr, addr, PAGE_SIZE - sizeof(UsedPH));
-//        } else {
-//            memcpy(new_addr, addr, PAGE_SIZE);
-//        }
         memcpy(new_addr, addr, old_ph_blk_sz);
         mem_free(addr);
         return new_addr;
@@ -472,10 +438,6 @@ void* mem_realloc(void *addr, size_t size)
 
 static void free_block(void* addr, size_t block_size, size_t prev_size)
 {
-//    printf("\nFREEING %p\nMem dump before\n", addr);
-//    mem_dump();
-//    printf("The tree\n");
-//    rbtree_print(free_big_bhs_root);
     size_t blk_idx = page_idx(addr);
     void* prev_addr = (char*) addr - prev_size;
     size_t prev_idx;
@@ -535,11 +497,6 @@ static void free_block(void* addr, size_t block_size, size_t prev_size)
         }
     }
     rbtree_insert(new_blk);
-//    printf("Mem dump after\n");
-//    mem_dump();
-//    printf("The tree\n");
-//    rbtree_print(free_big_bhs_root);
-//    printf("\n");
 }
 
 size_t formatted_prev_idx(int pow2, size_t pg_idx)
